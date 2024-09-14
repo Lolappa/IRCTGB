@@ -16,7 +16,9 @@
 
 using namespace std;
 
-queue<string> send_queue = {};
+queue<string> bot_send_queue = {};
+queue<string> irc_send_queue = {};
+
 string commDirectory = "./comms/";
 string output_file_name = "./comms/IRC";
 string service_name = "IRC";
@@ -33,7 +35,7 @@ vector<string> split_message(string command) {
 	return tokens;
 }
 
-void send_message(string name, string channel, string service, string message) {
+void irc_send_message(string name, string channel, string service, string message) {
 	string out = "";
 	out.append(":");
 	out.append(NICK);
@@ -47,7 +49,20 @@ void send_message(string name, string channel, string service, string message) {
 	out.append(message);
 	out.append("\n");
 
-	send_queue.push(out);
+	irc_send_queue.push(out);
+}
+
+void bot_send_message(string name, string channel, string message) {
+	string out = "";
+	out.append(name);
+	out.append("\n");
+	out.append(channel);
+	out.append("\n");
+	out.append(service_name);
+	out.append("\n");
+	out.append(message);
+	
+	bot_send_queue.push(out);
 }
 
 void file_write(string name, string channel, string message) {
@@ -56,14 +71,26 @@ void file_write(string name, string channel, string message) {
 	outputFile.close();
 }
 
-void send_process(int clientSocket, bool *bot_running) {
+void bot_send_process(int botSocket, bool *bot_running) {
 	while (*bot_running) {
-		if (send_queue.size()) {
-			string msg = send_queue.front();
+		if (bot_send_queue.size()) {
+			string msg = bot_send_queue.front();
+			cout << msg << endl;
+			const char* sendmsg = msg.c_str();
+			send(botSocket, sendmsg, strlen(sendmsg), 0);
+			bot_send_queue.pop();
+		}
+	}
+}
+
+void irc_send_process(int clientSocket, bool *bot_running) {
+	while (*bot_running) {
+		if (irc_send_queue.size()) {
+			string msg = irc_send_queue.front();
 			cout << msg << endl;
 			const char* sendmsg = msg.c_str();
 			send(clientSocket, sendmsg, strlen(sendmsg), 0);
-			send_queue.pop();
+			irc_send_queue.pop();
 		}
 	}
 }
@@ -110,7 +137,7 @@ void irc_receive_process(int clientSocket, bool *bot_running) {
 				msg.append(command.substr(command.find(":"), command.size() - 5));
 				msg.append("\n");
 				
-				send_queue.push(msg);
+				irc_send_queue.push(msg);
 			
 			// Check if the command is a message
 			} else if (split_message(command)[1] == "PRIVMSG") {
@@ -119,8 +146,9 @@ void irc_receive_process(int clientSocket, bool *bot_running) {
 				//find the second space in the command and extract the channel name
 				string channel = new_command[2];
 				string message = new_command[3].substr(1, new_command[3].size() - 1);
-				send_message(name, channel, service_name, message);
+				irc_send_message(name, channel, service_name, message);
 				file_write(name, channel, message);
+				bot_send_message(name, channel, message);
 			}
 		}
 	}
@@ -149,7 +177,7 @@ int main(int argc, char* argv[]) {
 	int botSocket = socket(AF_INET, SOCK_STREAM, 0);
 	sockaddr_in botAddress;
 	botAddress.sin_family = AF_INET;
-	botAddress.sin_port = htons(8075);
+	botAddress.sin_port = htons(8080);
 	botAddress.sin_addr.s_addr = INADDR_ANY;
 	cout << connect(botSocket, (struct sockaddr*)&botAddress, sizeof(botAddress)) << endl << strerror(errno) << endl;
 
@@ -164,16 +192,17 @@ int main(int argc, char* argv[]) {
 	// Create Threads
 	thread botReceiveProc(bot_receive_process, botSocket, &bot_running);
 	thread ircReceiveProc(irc_receive_process, clientSocket, &bot_running);
-	thread sendProc(send_process, clientSocket, &bot_running);
+	thread botSendProc(bot_send_process, botSocket, &bot_running);
+	thread ircSendProc(irc_send_process, clientSocket, &bot_running);
 	
 	string message = "NICK TestiBotti\n";
-	send_queue.push(message);
+	irc_send_queue.push(message);
 	
 	message = ":TestiBotti USER TestiBotti 0 * :Botti\n";
-	send_queue.push(message);
+	irc_send_queue.push(message);
 	
 	message = "MODE TestiBotti :+B\n";
-	send_queue.push(message);
+	irc_send_queue.push(message);
 	
 	cout << "Mode Changed" << endl;
 	
@@ -182,18 +211,19 @@ int main(int argc, char* argv[]) {
 	cout << endl;
 	
 	message = ":TestiBotti JOIN #botwars \n";
-	send_queue.push(message);
+	irc_send_queue.push(message);
 	
 	cout << "a" << endl;
 	cin >> a;
 	
 	message = ":TestiBotti PRIVMSG #botwars :Mui.\n";
-	send_queue.push(message);
+	irc_send_queue.push(message);
 	
 	bot_running = false;
 	botReceiveProc.join();
 	ircReceiveProc.join();
-	sendProc.join();
+	botSendProc.join();
+	ircSendProc.join();
 	close(clientSocket);
 	outputFile.close();
 	return 0;
