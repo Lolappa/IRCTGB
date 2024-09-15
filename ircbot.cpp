@@ -125,7 +125,7 @@ void bot_receive_process(bool *bot_running) {
 			if (!getline(file, channel)) break;
 			if (!getline(file, service)) break;
 			
-			if (service == service_name and !file.eof()) {
+			if (service != service_name and !file.eof()) {
 				string line = "";
 				vector<string> lines = {};
 				getline(file, line);
