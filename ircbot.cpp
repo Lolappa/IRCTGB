@@ -116,29 +116,32 @@ void irc_send_process(int clientSocket, bool *bot_running) {
 void bot_receive_process(bool *bot_running) {
 	ifstream file;
 	file.open(fifo_file_name);
-	if (file.is_open()) {
-		while (!file.eof()) {
-			string name;
-			string channel;
-			string service;
-			if (!getline(file, name)) break;
-			if (!getline(file, channel)) break;
-			if (!getline(file, service)) break;
-			
-			if (service != service_name and !file.eof()) {
-				string line = "";
-				vector<string> lines = {};
-				getline(file, line);
-				while (line != "φ" and !file.eof()) {
-					lines.push_back(line);
-					getline(file, line);
-				}
+	while (*bot_running) {
+		if (file.is_open()) {
+			while (!file.eof()) {
+				string name;
+				string channel;
+				string service;
+				if (!getline(file, name)) break;
+				if (!getline(file, channel)) break;
+				if (!getline(file, service)) break;
 				
-				for (string message: lines) {
-					cout << name << endl << channel << endl << service << endl << message << endl;
-					irc_send_message(name, channel, service, message);
+				if (service != service_name and !file.eof()) {
+					string line = "";
+					vector<string> lines = {};
+					getline(file, line);
+					while (line != "φ" and !file.eof()) {
+						lines.push_back(line);
+						getline(file, line);
+					}
+					
+					for (string message: lines) {
+						cout << name << endl << channel << endl << service << endl << message << endl;
+						irc_send_message(name, channel, service, message);
+					}
 				}
 			}
+			file.clear();
 		}
 	}
 	file.close();
