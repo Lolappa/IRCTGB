@@ -2,12 +2,12 @@
 local args = { ... }
 local token = args[1]
 
-local tg = require('telegram-bot-lua.core').configure(token)
+local tg = require("telegram-bot-lua.core").configure(token)
 
 function broadcast(user, text) -- impure
 	local file = io.open("./bridge", "a+")
 	print(user, text)
-	file:write(user, "\n", "#botwars", "\n", "tg", "\n", text, "\n", string.char(4), "\n")
+	file:write(user, "\n", "#botwars", "\n", "tg", "\n", text, "\n", "φ", "\n")
 	file:close()
 end
 

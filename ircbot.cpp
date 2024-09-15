@@ -82,7 +82,7 @@ void fifo_write(string name, string channel, string message) {
 		channel << endl <<
 		service_name << endl <<
 		message << endl <<
-		(char)4 << endl;
+		"φ" << endl;
 	file.close();
 }
 
@@ -129,7 +129,7 @@ void bot_receive_process(bool *bot_running) {
 				string line = "";
 				vector<string> lines = {};
 				getline(file, line);
-				while (line[0] != (char)4 and !file.eof()) {
+				while (line != "φ" and !file.eof()) {
 					lines.push_back(line);
 					getline(file, line);
 				}
