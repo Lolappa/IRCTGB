@@ -140,9 +140,9 @@ void bot_receive_process(bool *bot_running) {
 				}
 			}
 		}
-		file.clear();
 	}
 	file.close();
+	cout << "TUUBA!!!" << endl;
 	/*char buffer[1024] = { 0 };
 	string strbuffer = "";
 	while (*bot_running) {
