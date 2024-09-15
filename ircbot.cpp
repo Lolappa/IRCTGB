@@ -211,7 +211,7 @@ int main(int argc, char* argv[]) {
 			}
 		}
 	}
-	fifo_file.open(fifo_file_name);
+	fifo_file.open(fifo_file_name, ios::app);
 	
 	bool bot_running = true;
 	
