@@ -94,6 +94,7 @@ void bot_send_process(bool *bot_running) {
 			//cout << send(botSocket, sendmsg, strlen(sendmsg), 0) << endl;
 			bot_send_queue.pop();
 		}
+		std::this_thread::sleep_for(chrono::milliseconds(10));
 	}
 }
 
@@ -110,6 +111,7 @@ void irc_send_process(int clientSocket, bool *bot_running) {
 			const char* sendmsg = msg.c_str();
 			send(clientSocket, sendmsg, msg.size(), 0);
 		}
+		std::this_thread::sleep_for(chrono::milliseconds(10));
 	}
 }
 
@@ -143,35 +145,9 @@ void bot_receive_process(bool *bot_running) {
 			}
 			file.clear();
 		}
+		std::this_thread::sleep_for(chrono::milliseconds(10));
 	}
 	file.close();
-	cout << "TUUBA!!!" << endl;
-	/*char buffer[1024] = { 0 };
-	string strbuffer = "";
-	while (*bot_running) {
-		int buffer_length = recv(botSocket, buffer, sizeof(buffer), 0);
-		if (buffer_length > 1) {
-			int pos = 0;
-			strbuffer = string(buffer);
-			while (strbuffer.find("\n", pos) != buffer_length - 1) {
-				string name = strbuffer.substr(0, strbuffer.find("\n"));
-				pos = strbuffer.find("\n") + 1;
-				string channel = strbuffer.substr(pos, strbuffer.find("\n")-pos);
-				pos = strbuffer.find("\n") + 1;
-				string service = strbuffer.substr(pos, strbuffer.find("\n")-pos);
-				pos = strbuffer.find("\n") + 1;
-				string message = strbuffer.substr(pos, strbuffer.find("\n\n")-pos-1);
-				
-				vector<string> lines = bot_split_message(message);
-				if (service != service_name) {
-					for (string i: lines) {
-						cout << name << endl << channel << endl << service << endl << message << endl;
-						irc_send_message(name, channel, service, message);
-					}
-				}
-			}
-		}
-	}*/
 }
 
 void irc_receive_process(int clientSocket, bool *bot_running) {
@@ -206,6 +182,7 @@ void irc_receive_process(int clientSocket, bool *bot_running) {
 				//bot_send_message(name, channel, message);
 			}
 		}
+		std::this_thread::sleep_for(chrono::milliseconds(10));
 	}
 }
 
