@@ -1,4 +1,5 @@
 #include <cstring>
+#include <string>
 #include <iostream>
 #include <queue>
 #include <sys/socket.h>
@@ -21,7 +22,6 @@ queue<string> irc_send_queue = {};
 
 string fifo_file_name = "./bridge";
 string service_name = "IRC";
-fstream fifo_file;
 
 vector<string> bot_split_message(string message) {
 	vector<string> tokens = {};
@@ -75,15 +75,18 @@ void bot_send_message(string name, string channel, string message) {
 }
 
 void fifo_write(string name, string channel, string message) {
-	fifo_file <<
+	ofstream file;
+	file.open(fifo_file_name);
+	file <<
 		name << endl <<
 		channel << endl <<
 		service_name << endl <<
 		message << endl <<
 		(char)4 << endl;
+	file.close();
 }
 
-void bot_send_process(int botSocket, bool *bot_running) {
+void bot_send_process(bool *bot_running) {
 	while (*bot_running) {
 		if (bot_send_queue.size()) {
 			string msg = bot_send_queue.front();
@@ -97,6 +100,7 @@ void bot_send_process(int botSocket, bool *bot_running) {
 void irc_send_process(int clientSocket, bool *bot_running) {
 	while (*bot_running) {
 		if (irc_send_queue.size()) {
+			cout << "Tuuba2" << endl;
 			string msg = "";
 			while (irc_send_queue.size()) {
 				msg.append(irc_send_queue.front());
@@ -104,28 +108,30 @@ void irc_send_process(int clientSocket, bool *bot_running) {
 				irc_send_queue.pop();
 			}
 			const char* sendmsg = msg.c_str();
-			send(clientSocket, sendmsg, strlen(sendmsg), 0);
+			send(clientSocket, sendmsg, msg.size(), 0);
 		}
 	}
 }
 
-void bot_receive_process(int botSocket, bool *bot_running) {
-	if (fifo_file.is_open()) {
-		while (!fifo_file.eof()) {
+void bot_receive_process(bool *bot_running) {
+	ifstream file;
+	file.open(fifo_file_name);
+	if (file.is_open()) {
+		while (!file.eof()) {
 			string name;
 			string channel;
 			string service;
-			getline(fifo_file, name);
-			getline(fifo_file, channel);
-			getline(fifo_file, service);
+			if (!getline(file, name)) break;
+			if (!getline(file, channel)) break;
+			if (!getline(file, service)) break;
 			
-			if (service != service_name) {
+			if (service != service_name and !file.eof()) {
 				string line = "";
 				vector<string> lines = {};
-				getline(fifo_file, line);
-				while (line[0] != (char)30) {
+				getline(file, line);
+				while (line[0] != (char)4 and !file.eof()) {
 					lines.push_back(line);
-					getline(fifo_file, line);
+					getline(file, line);
 				}
 				
 				for (string message: lines) {
@@ -134,6 +140,7 @@ void bot_receive_process(int botSocket, bool *bot_running) {
 				}
 			}
 		}
+	file.close();
 	}
 	/*char buffer[1024] = { 0 };
 	string strbuffer = "";
@@ -176,6 +183,7 @@ void irc_receive_process(int clientSocket, bool *bot_running) {
 			
 			// Check for a ping and respond
 			if (command.find("PING") == 0) {
+				cout << "Tuuba3" << endl;
 				string msg = "";
 				msg.append("PONG ");
 				msg.append(command.substr(command.find(":"), command.size() - 5));
@@ -184,7 +192,7 @@ void irc_receive_process(int clientSocket, bool *bot_running) {
 				irc_send_queue.push(msg);
 			
 			// Check if the command is a message
-			} else if (split_message(command)[1] == "PRIVMSG") {
+			} else if (command.substr(command.find(" ") + 1, 7) == "PRIVMSG") {
 				vector<string> new_command = split_message(command);
 				string name = new_command[0].substr(1, new_command[0].find("!") - 1);
 				//find the second space in the command and extract the channel name
@@ -211,16 +219,16 @@ int main(int argc, char* argv[]) {
 			}
 		}
 	}
-	fifo_file.open(fifo_file_name, ios::app);
-	
+	cout << strerror(errno) << endl;
 	bool bot_running = true;
-	
+	/*
 	int botSocket = socket(AF_INET, SOCK_STREAM, 0);
 	sockaddr_in botAddress;
 	botAddress.sin_family = AF_INET;
 	botAddress.sin_port = htons(8080);
 	botAddress.sin_addr.s_addr = INADDR_ANY;
 	cout << connect(botSocket, (struct sockaddr*)&botAddress, sizeof(botAddress)) << endl << strerror(errno) << endl;
+	*/
 
 	// Connect to pvlnet
 	int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
@@ -231,19 +239,23 @@ int main(int argc, char* argv[]) {
 	cout << connect(clientSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) << endl << strerror(errno) << endl;
 	
 	// Create Threads
-	thread botReceiveProc(bot_receive_process, botSocket, &bot_running);
+	thread botReceiveProc(bot_receive_process, &bot_running);
 	thread ircReceiveProc(irc_receive_process, clientSocket, &bot_running);
-	//thread botSendProc(bot_send_process, botSocket, &bot_running);
+	thread botSendProc(bot_send_process, &bot_running);
 	thread ircSendProc(irc_send_process, clientSocket, &bot_running);
+	cout << "Tuuba" << endl;
+
+	/*string message = "NICK TestiBotti\n";*/
+	cout << "Tuuba" << endl;
+	irc_send_queue.push(string("NICK TestiBotti\n"));
+	cout << "Tuuba" << endl;
 	
-	string message = "NICK TestiBotti\n";
-	irc_send_queue.push(message);
+	/*message = ":TestiBotti USER TestiBotti 0 * :Botti\n";*/
+	cout << "Tuuba" << endl;
+	irc_send_queue.push(string(":TestiBotti USER TestiBotti 0 * :Botti\n"));
 	
-	message = ":TestiBotti USER TestiBotti 0 * :Botti\n";
-	irc_send_queue.push(message);
-	
-	message = "MODE TestiBotti :+B\n";
-	irc_send_queue.push(message);
+	/*message = "MODE TestiBotti :+B\n";*/
+	irc_send_queue.push(string("MODE TestiBotti :+B\n"));
 	
 	cout << "Mode Changed" << endl;
 	
@@ -251,14 +263,14 @@ int main(int argc, char* argv[]) {
 	cin >> a;
 	cout << endl;
 	
-	message = ":TestiBotti JOIN #botwars \n";
-	irc_send_queue.push(message);
+	/*message = ":TestiBotti JOIN #botwars \n";*/
+	irc_send_queue.push(string(":TestiBotti JOIN #botwars \n"));
 	
 	cout << "a" << endl;
 	cin >> a;
 	
-	message = ":TestiBotti PRIVMSG #botwars :Mui.\n";
-	irc_send_queue.push(message);
+	/*message = ":TestiBotti PRIVMSG #botwars :Mui.\n";*/
+	irc_send_queue.push(string(":TestiBotti PRIVMSG #botwars :Mui.\n"));
 	
 	cout << "Exiting" << endl;
 	bot_running = false;
