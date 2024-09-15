@@ -75,7 +75,12 @@ void bot_send_message(string name, string channel, string message) {
 }
 
 void fifo_write(string name, string channel, string message) {
-	fifo_file << name << endl << channel << endl << service_name << endl << message << endl << (char)30 << endl;
+	fifo_file <<
+		name << endl <<
+		channel << endl <<
+		service_name << endl <<
+		message << endl <<
+		(char)4 << endl;
 }
 
 void bot_send_process(int botSocket, bool *bot_running) {
@@ -92,11 +97,14 @@ void bot_send_process(int botSocket, bool *bot_running) {
 void irc_send_process(int clientSocket, bool *bot_running) {
 	while (*bot_running) {
 		if (irc_send_queue.size()) {
-			string msg = irc_send_queue.front();
-			cout << msg << endl;
+			string msg = "";
+			while (irc_send_queue.size()) {
+				msg.append(irc_send_queue.front());
+				cout << msg << endl;
+				irc_send_queue.pop();
+			}
 			const char* sendmsg = msg.c_str();
 			send(clientSocket, sendmsg, strlen(sendmsg), 0);
-			irc_send_queue.pop();
 		}
 	}
 }
@@ -194,6 +202,7 @@ int main(int argc, char* argv[]) {
 	{ // Process arguments
 			for (int i = 1; i < argc; i++) {
 			string argument = string(argv[i]);
+
 			if (argument.find("--filename=") == 0) {
 				fifo_file_name = argument.substr(11, argument.size()-11);
 			} else
