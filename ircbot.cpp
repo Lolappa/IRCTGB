@@ -140,8 +140,8 @@ void bot_receive_process(bool *bot_running) {
 				}
 			}
 		}
-	file.close();
 	}
+	file.close();
 	/*char buffer[1024] = { 0 };
 	string strbuffer = "";
 	while (*bot_running) {
