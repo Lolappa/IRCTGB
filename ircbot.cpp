@@ -125,7 +125,7 @@ void bot_receive_process(bool *bot_running) {
 			if (!getline(file, channel)) break;
 			if (!getline(file, service)) break;
 			
-			if (service != service_name and !file.eof()) {
+			if (service == service_name and !file.eof()) {
 				string line = "";
 				vector<string> lines = {};
 				getline(file, line);
@@ -180,7 +180,6 @@ void irc_receive_process(int clientSocket, bool *bot_running) {
 			//extract the latest command
 			string command = strbuffer.substr(0, strbuffer.find("\n"));
 			cout << command << endl << "###############################################" << endl;
-			
 			// Check for a ping and respond
 			if (command.find("PING") == 0) {
 				cout << "Tuuba3" << endl;
@@ -198,7 +197,7 @@ void irc_receive_process(int clientSocket, bool *bot_running) {
 				//find the second space in the command and extract the channel name
 				string channel = new_command[2];
 				string message = new_command[3].substr(1, new_command[3].size() - 1);
-				irc_send_message(name, channel, service_name, message);
+				//irc_send_message(name, channel, service_name, message);
 				fifo_write(name, channel, message);
 				//bot_send_message(name, channel, message);
 			}
@@ -276,7 +275,7 @@ int main(int argc, char* argv[]) {
 	bot_running = false;
 	botReceiveProc.join();
 	ircReceiveProc.join();
-	//botSendProc.join();
+	botSendProc.join();
 	ircSendProc.join();
 	close(clientSocket);
 	return 0;
