@@ -140,6 +140,7 @@ void bot_receive_process(bool *bot_running) {
 				}
 			}
 		}
+		file.clear();
 	}
 	file.close();
 	/*char buffer[1024] = { 0 };
