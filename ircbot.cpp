@@ -19,13 +19,21 @@ using namespace std;
 queue<string> bot_send_queue = {};
 queue<string> irc_send_queue = {};
 
-string commDirectory = "./comms/";
-string output_file_name = "./comms/IRC";
+string fifo_file_name = "./bridge";
 string service_name = "IRC";
-ofstream outputFile;
+fstream fifo_file;
+
+vector<string> bot_split_message(string message) {
+	vector<string> tokens = {};
+	while (message.size() > 0) {
+		tokens.push_back(message.substr(0, message.find("\n")));
+		message.erase(0, message.find("\n") + 1);
+	}
+	return tokens;
+}
 
 vector<string> split_message(string command) {
-	vector<string> tokens;
+	vector<string> tokens = {};
 	for (int i = 0; i < 3; i++) {
 		tokens.push_back(command.substr(0, command.find(" ")));
 		command.erase(0, command.find(" ") + 1);
@@ -61,23 +69,21 @@ void bot_send_message(string name, string channel, string message) {
 	out.append(service_name);
 	out.append("\n");
 	out.append(message);
+	out.append("\n\n");
 	
 	bot_send_queue.push(out);
 }
 
-void file_write(string name, string channel, string message) {
-	outputFile.open(output_file_name);
-	outputFile << name << endl << channel << endl << service_name << message << endl;
-	outputFile.close();
+void fifo_write(string name, string channel, string message) {
+	fifo_file << name << endl << channel << endl << service_name << endl << message << endl;
 }
 
 void bot_send_process(int botSocket, bool *bot_running) {
 	while (*bot_running) {
 		if (bot_send_queue.size()) {
 			string msg = bot_send_queue.front();
-			cout << msg << endl;
 			const char* sendmsg = msg.c_str();
-			send(botSocket, sendmsg, strlen(sendmsg), 0);
+			//cout << send(botSocket, sendmsg, strlen(sendmsg), 0) << endl;
 			bot_send_queue.pop();
 		}
 	}
@@ -95,11 +101,36 @@ void irc_send_process(int clientSocket, bool *bot_running) {
 	}
 }
 
-void bot_receive_process(int clientSocket, bool *bot_running) {
-	char buffer[1024] = { 0 };
+void bot_receive_process(int botSocket, bool *bot_running) {
+	if (fifo_file.is_open()) {
+		while (!fifo_file.eof()) {
+			string name;
+			string channel;
+			string service;
+			getline(fifo_file, name);
+			getline(fifo_file, channel);
+			getline(fifo_file, service);
+			
+			if (service != service_name) {
+				string line = "";
+				vector<string> lines = {};
+				getline(fifo_file, line);
+				while (line[0] != (char)30) {
+					lines.push_back(line);
+					getline(fifo_file, line);
+				}
+				
+				for (string message: lines) {
+					cout << name << endl << channel << endl << service << endl << message << endl;
+					irc_send_message(name, channel, service, message);
+				}
+			}
+		}
+	}
+	/*char buffer[1024] = { 0 };
 	string strbuffer = "";
 	while (*bot_running) {
-		int buffer_length = recv(clientSocket, buffer, sizeof(buffer), 0);
+		int buffer_length = recv(botSocket, buffer, sizeof(buffer), 0);
 		if (buffer_length > 1) {
 			int pos = 0;
 			strbuffer = string(buffer);
@@ -110,13 +141,18 @@ void bot_receive_process(int clientSocket, bool *bot_running) {
 				pos = strbuffer.find("\n") + 1;
 				string service = strbuffer.substr(pos, strbuffer.find("\n")-pos);
 				pos = strbuffer.find("\n") + 1;
-				string message = strbuffer.substr(pos, strbuffer.find("\n")-pos);
+				string message = strbuffer.substr(pos, strbuffer.find("\n\n")-pos-1);
 				
-				cout << name << endl << channel << endl << service << endl << message << endl;
-				//send_message(name, channel, service, message);
+				vector<string> lines = bot_split_message(message);
+				if (service != service_name) {
+					for (string i: lines) {
+						cout << name << endl << channel << endl << service << endl << message << endl;
+						irc_send_message(name, channel, service, message);
+					}
+				}
 			}
 		}
-	}
+	}*/
 }
 
 void irc_receive_process(int clientSocket, bool *bot_running) {
@@ -147,8 +183,8 @@ void irc_receive_process(int clientSocket, bool *bot_running) {
 				string channel = new_command[2];
 				string message = new_command[3].substr(1, new_command[3].size() - 1);
 				irc_send_message(name, channel, service_name, message);
-				file_write(name, channel, message);
-				bot_send_message(name, channel, message);
+				fifo_write(name, channel, message);
+				//bot_send_message(name, channel, message);
 			}
 		}
 	}
@@ -156,21 +192,17 @@ void irc_receive_process(int clientSocket, bool *bot_running) {
 
 int main(int argc, char* argv[]) {
 	{ // Process arguments
-		string filename = "IRC"; 
 			for (int i = 1; i < argc; i++) {
 			string argument = string(argv[i]);
-			if (argument.find("--dir=") == 0) {
-				commDirectory = argument.substr(6, argument.size() - 6);
-			} else
 			if (argument.find("--filename=") == 0) {
-				filename = argument.substr(11, argument.size()-11);
+				fifo_file_name = argument.substr(11, argument.size()-11);
 			} else
 			if (argument.find("--name=") == 0) {
 				service_name = argument.substr(7, argument.size()-7);
 			}
 		}
-		output_file_name = commDirectory + filename;
 	}
+	fifo_file.open(fifo_file_name);
 	
 	bool bot_running = true;
 	
@@ -187,12 +219,12 @@ int main(int argc, char* argv[]) {
 	serverAddress.sin_family = AF_INET;
 	serverAddress.sin_port = htons(6667);
 	inet_pton(AF_INET, "135.181.107.23", &serverAddress.sin_addr);	
-	connect(clientSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress));
+	cout << connect(clientSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) << endl << strerror(errno) << endl;
 	
 	// Create Threads
 	thread botReceiveProc(bot_receive_process, botSocket, &bot_running);
 	thread ircReceiveProc(irc_receive_process, clientSocket, &bot_running);
-	thread botSendProc(bot_send_process, botSocket, &bot_running);
+	//thread botSendProc(bot_send_process, botSocket, &bot_running);
 	thread ircSendProc(irc_send_process, clientSocket, &bot_running);
 	
 	string message = "NICK TestiBotti\n";
@@ -219,12 +251,12 @@ int main(int argc, char* argv[]) {
 	message = ":TestiBotti PRIVMSG #botwars :Mui.\n";
 	irc_send_queue.push(message);
 	
+	cout << "Exiting" << endl;
 	bot_running = false;
 	botReceiveProc.join();
 	ircReceiveProc.join();
-	botSendProc.join();
+	//botSendProc.join();
 	ircSendProc.join();
 	close(clientSocket);
-	outputFile.close();
 	return 0;
 }
