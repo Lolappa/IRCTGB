@@ -75,7 +75,7 @@ void bot_send_message(string name, string channel, string message) {
 }
 
 void fifo_write(string name, string channel, string message) {
-	fifo_file << name << endl << channel << endl << service_name << endl << message << endl;
+	fifo_file << name << endl << channel << endl << service_name << endl << message << endl << (char)30 << endl;
 }
 
 void bot_send_process(int botSocket, bool *bot_running) {
